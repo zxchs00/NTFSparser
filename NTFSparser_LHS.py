@@ -203,6 +203,27 @@ def FindMFTentry(fp, ira, iaa, name):
         else:
             ne += ne_len
 
+def slackMFT(indx, ne, parent_mft, ret, slack_fin):
+    # find deleted files from slack
+    chk_first = True
+    slack_ret = []
+    while True:
+        if indx[ne:ne+8] == parent_mft:
+            if chk_first:
+                ne -= 0x10
+                chk_first = False
+            slack_mft = LtoB(indx[ne:ne+0x6])
+            if ret.count(slack_mft) == 0:
+                slack_ret.append(slack_mft)
+            ne_len = LtoB(indx[ne+0x08:ne+0x0A])
+            if ne_len == 0:
+                ne += 8
+            else:
+                ne += ne_len
+            continue
+        ne += 8
+        if ne >= slack_fin:
+            return slack_ret
 def allMFTfromVCN(fp, iaa, vcn):
     ret = []
     start = LtoB(iaa[0x10:0x18])
@@ -249,16 +270,23 @@ def allMFTfromVCN(fp, iaa, vcn):
         indx[0x200*i-2] = indx[fixup+i*2]
         indx[0x200*i-1] = indx[fixup+i*2+1]
     offset = LtoB(indx[0x18:0x1C])
-    fin = LtoB(indx[0x1C:0x20])
+    #fin = LtoB(indx[0x1C:0x20])
+    slack_fin = LtoB(indx[0x20:0x28])
     ne = 0x18+offset
+    fin = 0x18 + slack_fin
+    parent_mft = indx[ne+0x10:ne+0x18]
     while True:
         ne_len = LtoB(indx[ne+0x08:ne+0x0A])
         node_entry = indx[ne:ne+ne_len]
         flag = LtoB(indx[ne+0x0C:ne+0x10]) & 0x03
         if flag == 0x02:
+            # after this, file slack
+            ne += ne_len + 0x10
+            ret.append(slackMFT(indx, ne, parent_mft, ret, fin))
             return ret
         elif flag == 0x03:
             vcn = LtoB(indx[-0x08:])
+            ret.append(slackMFT(indx, ne, parent_mft, ret, fin))
             return ret + allMFTfromVCN(fp, iaa, vcn)
         
         if flag == 0x01:
@@ -268,7 +296,6 @@ def allMFTfromVCN(fp, iaa, vcn):
         ret.append(LtoB(node_entry[0:6]))
         
         ne += ne_len
-
 
 # get all children's mft entries index buffer
 # it returns array of children's mft entries
@@ -608,7 +635,7 @@ def ntfs_parse(path):
     child_mfts = ChildMFTs(f, ira, iaa)
     
     if child_mfts.count(-1) > 0:
-        print child_mfts
+        #print child_mfts
         print_err(u'하위 경로의 MFT 번호 중 오류가 있습니다.')
         #sys.exit()
     
@@ -624,7 +651,12 @@ def ntfs_parse(path):
     outhtml.write(path)
     outhtml.write(html_table)
     # table content
+    deleted_mfts = []
     for i in range(len(child_mfts)):
+        # slack
+        if type(child_mfts[i]) == list:
+            deleted_mfts += child_mfts[i]
+            continue
         # go to mft
         MFTentry_num = child_mfts[i]
         if MFTentry_num == -1:
@@ -782,7 +814,24 @@ def ntfs_parse(path):
         text = ('<tr align="center"><td>'+str(i+1)+'</td><td><a href="'+path+filename+'">'+filename+'</a></td><td>'+filesize+'</td><td>'+str(child_mfts[i]).encode('utf-8')+'</td><td>'+Ctime+'</td><td>'+Mtime+'</td><td>'+Etime+'</td><td>'+Atime+'</td></tr>')
         
         outhtml.write(text)
-        
+    
+    # delete duplicate mft
+    deleted_mfts_nodup = []
+    for j in deleted_mfts:
+        if deleted_mfts_nodup.count(j) == 0:
+            deleted_mfts_nodup.append(j)
+
+    for j in range(len(deleted_mfts_nodup)):
+        if child_mfts.count(deleted_mfts_nodup[j]) != 0:
+            continue
+        if deleted_mfts_nodup[j] == -1:
+            text = ('<tr align="center" class="danger"><td>'+str(i+j)+'</td><td><a href="'+'">'+'(deleted)</a></td><td>'+'</td><td>'+'error'+'</td><td>'+'</td><td>'+'</td><td>'+'</td><td>'+'</td></tr>')
+        else:
+            filename = NameMFT(f,mft_offsets,deleted_mfts_nodup[j])
+            filename = str(QtCore.QString(filename).toUtf8())
+            text = ('<tr align="center" class="danger"><td>'+str(i+j)+'</td><td><a href="'+'">'+filename+'(deleted)</a></td><td>'+'</td><td>'+str(deleted_mfts_nodup[j]).encode('utf-8')+'</td><td>'+'</td><td>'+'</td><td>'+'</td><td>'+'</td></tr>')
+            
+        outhtml.write(text)
     outhtml.write(html_end)
     
     f.close()
