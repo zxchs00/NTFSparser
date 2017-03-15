@@ -224,11 +224,15 @@ def allMFTfromVCN(fp, iaa, vcn):
         rl = cluster_run[ptr] & 0xF # run length position
         add_len = cluster_run[ptr] >> 4 # address length
         run_len = LtoB(cluster_run[ptr+1:ptr+1+rl]) # run length
+        add = LtoB(cluster_run[ptr+1+rl:ptr+1+rl+add_len])
+        chk = add >> (add_len*8-1)
+        if chk == 1:
+            add = 0 - ((add^((1 << (add_len*8)) - 1)) + 1)
         if avcn < run_len:
-            address += LtoB(cluster_run[ptr+1+rl:ptr+1+rl+add_len])*0x1000+0x1000*(avcn) # sector * cluster
+            address += add*0x1000+0x1000*(avcn) # sector * cluster
             break
         else:
-            address += LtoB(cluster_run[ptr+1+rl:ptr+1+rl+add_len])*0x1000 # sector * cluster
+            address += add*0x1000 # sector * cluster
             avcn -= run_len
             ptr += 1 + rl + add_len
     
@@ -609,6 +613,7 @@ def ntfs_parse(path):
         if MFTentry_num == -1:
             text = ('<tr align="center"><td>'+str(i+1)+'</td><td><a href="'+'">'+'</a></td><td>'+'</td><td>'+'error'+'</td><td>'+'</td><td>'+'</td><td>'+'</td><td>'+'</td></tr>')
             outhtml.write(text)
+            continue
         mft_offset = 0
         for j in range(len(mft_offsets)/2):
             mft_offset += mft_offsets[2*j]
@@ -664,7 +669,7 @@ def ntfs_parse(path):
                 
                 # end of mft entry
                 if att_type == 0xFFFFFFFF:
-                    print_err(u"error: there is no data attr")
+                    print_err(u"error: there is no data attr - MFT num:"+str(child_mfts[i]))
                     break
                 
                 # data attr
