@@ -362,6 +362,23 @@ def NameMFT(fp, mft_offsets, mft_num):
             #print 'error'
             return name
 
+def get_MFTarr(fp, mft_offsets, mft_num):
+    # go to mft
+    MFTentry_num = mft_num
+    if MFTentry_num == -1:
+        print_err(u"using get_MFTarr function error")
+        sys.exit()
+    mft_offset = 0
+    for j in range(len(mft_offsets)/2):
+        mft_offset += mft_offsets[2*j]
+        if(MFTentry_num < (mft_offsets[2*j+1]*4)):
+            break
+        else:
+            MFTentry_num -= mft_offsets[2*j+1]*4
+    fp.seek(mft_offset + MFTentry_num*0x400)
+    get_mft = bytearray(fp.read(0x400))
+    return get_mft
+
 def print_err(msg):
     a = QtGui.QMessageBox()
     a.setWindowTitle("Error")
@@ -461,7 +478,7 @@ def ntfs_parse(path):
     f.seek(mft_offset + 5*0x400)
     mft = bytearray(f.read(0x400))
     if mft[0:4] != 'FILE':
-        print_err(u'reading root mft error. line:451')
+        print_err(u'reading root mft error. line:464')
         #sys.exit()
         return
     
@@ -672,6 +689,37 @@ def ntfs_parse(path):
                     print_err(u"error: there is no data attr - MFT num:"+str(child_mfts[i]))
                     break
                 
+                # attr_list attr
+                if att_type == 0x20:
+                    attr_list = mft[attr:attr+att_len]
+                    att_entry = 0x18
+                    filesize = 0
+                    while att_entry < att_len:
+                        entry_len = LtoB(attr_list[att_entry+4:att_entry+6])
+                        if LtoB(attr_list[att_entry:att_entry+4]) == 0x80:
+                            node_mft = get_MFTarr(f, mft_offsets, LtoB(attr_list[att_entry+0x10:att_entry+0x16]))
+                            node_attr = 0x38
+                            while True:
+                                node_att_type = LtoB(node_mft[node_attr:node_attr+4])
+                                node_att_len = LtoB(node_mft[node_attr+4:node_attr+8])
+                                if node_att_type == 0xFFFFFFFF:
+                                    break
+                                if node_att_type == 0x80:
+                                    data = node_mft[node_attr:node_attr+node_att_len]
+                                    res_flag = data[0x08] & 0x01
+                                    # resident
+                                    if res_flag == 0x00:
+                                        filesize += LtoB(data[0x10:0x14])
+                                    # non-resident
+                                    else:
+                                        filesize += (LtoB(data[0x18:0x20]) - LtoB(data[0x10:0x18]))*sec*clu
+                                node_attr += node_att_len
+                                if node_attr >= 0x400:
+                                    break
+                        att_entry += entry_len
+                    filesize = str(filesize)
+                    break
+
                 # data attr
                 if att_type == 0x80:
                     data = mft[attr:attr+att_len]
