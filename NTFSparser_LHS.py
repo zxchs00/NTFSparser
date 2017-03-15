@@ -430,12 +430,16 @@ def ntfs_parse(path):
             ptr = 0
             while True:
                 if cluster_run[ptr] == 0:
-                    print mft_offsets
+                    #print mft_offsets
                     break
                 rl = cluster_run[ptr] & 0xF # run length position
                 add_len = cluster_run[ptr] >> 4 # address length
                 run_len = LtoB(cluster_run[ptr+1:ptr+1+rl]) # run length
-                mft_offsets.append(LtoB(cluster_run[ptr+1+rl:ptr+1+rl+add_len])*0x1000)
+                add = LtoB(cluster_run[ptr+1+rl:ptr+1+rl+add_len])
+                chk = add >> (add_len*4-1)
+                if chk == 1:
+                    add = add^(1 << (add_len*4) - 1) + 1
+                mft_offsets.append(add*0x1000)
                 mft_offsets.append(run_len)
                 ptr += 1 + rl + add_len            
             break
