@@ -436,9 +436,9 @@ def ntfs_parse(path):
                 add_len = cluster_run[ptr] >> 4 # address length
                 run_len = LtoB(cluster_run[ptr+1:ptr+1+rl]) # run length
                 add = LtoB(cluster_run[ptr+1+rl:ptr+1+rl+add_len])
-                chk = add >> (add_len*16-1)
+                chk = add >> (add_len*8-1)
                 if chk == 1:
-                    add = add^(1 << (add_len*16) - 1) + 1
+                    add = 0 - ((add^((1 << (add_len*8)) - 1)) + 1)
                 mft_offsets.append(add*0x1000)
                 mft_offsets.append(run_len)
                 ptr += 1 + rl + add_len            
