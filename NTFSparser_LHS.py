@@ -712,7 +712,16 @@ def ntfs_parse(path):
                                         filesize += LtoB(data[0x10:0x14])
                                     # non-resident
                                     else:
-                                        filesize += (LtoB(data[0x18:0x20]) - LtoB(data[0x10:0x18]))*sec*clu
+                                        filesize += LtoB(data[0x30:0x38])
+                                        '''
+                                        pos = LtoB(data[0x20:0x22])
+                                        while data[pos] != 0:
+                                            add_len = data[pos] >> 4
+                                            run_len = data[pos] & 0xF
+                                            filesize += LtoB(data[pos+1:pos+1+run_len])*sec*clu
+                                            pos += (add_len + run_len + 1)
+                                        '''
+                                        #filesize += (LtoB(data[0x18:0x20]) - LtoB(data[0x10:0x18]))*sec*clu
                                 node_attr += node_att_len
                                 if node_attr >= 0x400:
                                     break
@@ -730,7 +739,16 @@ def ntfs_parse(path):
                     # non-resident attr
                     else:
                         # byte
-                        filesize = (LtoB(data[0x18:0x20]) - LtoB(data[0x10:0x18]))*sec*clu
+                        filesize = LtoB(data[0x30:0x38])
+                        '''
+                        pos = LtoB(data[0x20:0x22])
+                        while data[pos] != 0:
+                            add_len = data[pos] >> 4
+                            run_len = data[pos] & 0xF
+                            filesize = LtoB(data[pos+1:pos+1+run_len])*sec*clu
+                            pos += (add_len + run_len + 1)
+                        '''
+                        #filesize = (LtoB(data[0x18:0x20]) - LtoB(data[0x10:0x18]))*sec*clu
                     filesize = str(filesize)# + ' Byte'
                     break
                 attr += att_len
