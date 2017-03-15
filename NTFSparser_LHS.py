@@ -175,7 +175,7 @@ def FindMFTentry(fp, ira, iaa, name):
         if flag == 0x2:
             # end of node but no vcn
             #print "error"
-            return [-1]
+            return -1
         elif flag == 0x03:
             # end of node and have vcn
             vcn = LtoB(node_entry[ne_len-0x08:])
@@ -321,7 +321,8 @@ def NameMFT(fp, mft_offsets, mft_num):
     mft = bytearray(fp.read(0x400))
     if mft[0:4] != 'FILE':
         #print 'reading mft error'
-        sys.exit()
+        #sys.exit()
+        return u"error"
     # fixup
     fixup = LtoB(mft[4:6])
     mft[0x200-2] = mft[fixup+2]
@@ -383,7 +384,8 @@ def ntfs_parse(path):
     # check ntfs
     if vbr[3:7] != "NTFS":
         print_err(u'error: 경로가 NTFS 시스템이 아닙니다.')
-        sys.exit()
+        #sys.exit()
+        return
     
     # sector size (byte)
     sec = LtoB(vbr[0x0B:0x0C+1])
@@ -398,7 +400,8 @@ def ntfs_parse(path):
     mft = bytearray(f.read(0x400))
     if mft[0:4] != 'FILE':
         print_err(u"reading MFT's mft error")
-        sys.exit()
+        #sys.exit()
+        return
     # fixup
     fixup = LtoB(mft[4:6])
     mft[0x200-2] = mft[fixup+2]
@@ -440,7 +443,8 @@ def ntfs_parse(path):
         # end of mft entry
         if attr >= 0x400:
             print_err(u"error: MFT has no data attr")
-            sys.exit()
+            #sys.exit()
+            return
     
     
     ############################################
@@ -449,8 +453,9 @@ def ntfs_parse(path):
     f.seek(mft_offset + 5*0x400)
     mft = bytearray(f.read(0x400))
     if mft[0:4] != 'FILE':
-        print_err(u'reading mft error 451')
-        sys.exit()
+        print_err(u'reading root mft error. line:451')
+        #sys.exit()
+        return
     
     # fixup
     fixup = LtoB(mft[4:6])
@@ -463,7 +468,8 @@ def ntfs_parse(path):
     flag = LtoB(mft[0x16:0x18])
     if (flag & 0x2) == 0:
         print_err(u"디렉토리가 아닙니다.")
-        sys.exit()
+        #sys.exit()
+        return
     
     # find filename attr
     attr = 0x38
@@ -520,9 +526,8 @@ def ntfs_parse(path):
             mft = bytearray(f.read(0x400))
             if mft[0:4] != 'FILE':
                 print_err(str(path_split[curr])+u' - reading mft error.\nMFT entry num:'+str(MFTentry_num))
-                sys.exit()
-            else:
-                pass
+                #sys.exit()
+                return
             
             # fixup
             fixup = LtoB(mft[4:6])
@@ -534,7 +539,8 @@ def ntfs_parse(path):
             # directory check
             flag = LtoB(mft[0x16:0x18])
             if (flag & 0x2) == 0:
-                print_err(u"디렉토리가 아닙니다.")
+                print_err(str(path_split[curr])+u"는 디렉토리가 아닙니다.")
+                return
             
             # find filename attr
             attr = 0x38
@@ -578,7 +584,7 @@ def ntfs_parse(path):
     
     if child_mfts.count(-1) > 0:
         print child_mfts
-        print_err(u'there is error in childrens MFT')
+        print_err(u'하위 경로의 MFT 번호 중 오류가 있습니다.')
         #sys.exit()
     
     outhtml = open('indexs.html','wb')
@@ -597,7 +603,8 @@ def ntfs_parse(path):
         # go to mft
         MFTentry_num = child_mfts[i]
         if MFTentry_num == -1:
-            continue
+            text = ('<tr align="center"><td>'+str(i+1)+'</td><td><a href="'+'">'+'</a></td><td>'+'</td><td>'+'error'+'</td><td>'+'</td><td>'+'</td><td>'+'</td><td>'+'</td></tr>')
+            outhtml.write(text)
         mft_offset = 0
         for j in range(len(mft_offsets)/2):
             mft_offset += mft_offsets[2*j]
@@ -609,8 +616,11 @@ def ntfs_parse(path):
         f.seek(mft_offset + MFTentry_num*0x400)
         mft = bytearray(f.read(0x400))
         if mft[0:4] != 'FILE':
-            print_err('reading mft error 609')
-            sys.exit()
+            print_err('reading mft error. line:619')
+            #sys.exit()
+            text = ('<tr align="center"><td>'+str(i+1)+'</td><td><a href="'+'">'+'</a></td><td>'+'</td><td>'+str(child_mfts[i]).encode('utf-8')+'</td><td>'+'</td><td>'+'</td><td>'+'</td><td>'+'</td></tr>')
+            outhtml.write(text)
+            continue
         
         # fixup
         fixup = LtoB(mft[4:6])
@@ -629,7 +639,10 @@ def ntfs_parse(path):
         att_type = LtoB(mft[attr:attr+4])
         if att_type != 0x10:
             print_err(u'standard information error')
-            sys.exit()
+            #sys.exit()
+            text = ('<tr align="center"><td>'+str(i+1)+'</td><td><a href="'+'">'+'</a></td><td>'+'</td><td>'+str(child_mfts[i]).encode('utf-8')+'</td><td>'+'</td><td>'+'</td><td>'+'</td><td>'+'</td></tr>')
+            outhtml.write(text)
+            continue
         att_len = LtoB(mft[attr+4:attr+8])    
         sia = mft[attr:attr+att_len]
         Ctime = time64bit(LtoB(sia[0x18:0x20]))
