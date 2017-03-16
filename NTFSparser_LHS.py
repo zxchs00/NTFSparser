@@ -557,11 +557,12 @@ def ntfs_parse(path):
     
     # current path
     a = u''.join(filename.decode('utf-16'))
-    
+    select_MFT = 0
+
     # directory traversing
     while path_split[curr] != '':
         MFTentry_num = FindMFTentry(f, ira,iaa,path_split[curr])
-        
+        select_MFT = MFTentry_num
         if MFTentry_num == -1:
             print_err(str(path_split[curr])+u': no such directory')
         else:
@@ -823,6 +824,8 @@ def ntfs_parse(path):
 
     for j in range(len(deleted_mfts_nodup)):
         if child_mfts.count(deleted_mfts_nodup[j]) != 0:
+            continue
+        if select_MFT == deleted_mfts_nodup[j]:
             continue
         if deleted_mfts_nodup[j] == -1:
             text = ('<tr align="center" class="danger"><td>'+str(i+j)+'</td><td><a href="'+'">'+'(deleted)</a></td><td>'+'</td><td>'+'error'+'</td><td>'+'</td><td>'+'</td><td>'+'</td><td>'+'</td></tr>')
